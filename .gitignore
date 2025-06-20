@@ -1,0 +1,37 @@
+# Node modules
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+
+# Dependency directories
+bower_components/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+
+# VSCode settings
+.vscode/
+
+# Chrome extension specific
+*.crx
+*.pem
+*.zip
+
+# Test coverage
+coverage/
+
+# Notes
+notes/
