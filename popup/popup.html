@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeAgree</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <img src="../icons/icon128.png" alt="SafeAgree Logo" width="32" height="32">
+                <h1>SafeAgree</h1>
+            </div>
+            <div class="status-indicator" id="statusIndicator">
+                <span class="status-dot" id="statusDot"></span>
+                <span class="status-text" id="statusText">Checking...</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Detection Status -->
+            <section class="detection-section" id="detectionSection">
+                <div class="detection-card" id="detectionCard">
+                    <div class="detection-icon" id="detectionIcon">📄</div>
+                    <div class="detection-info">
+                        <h3 id="detectionTitle">Analyzing page...</h3>
+                        <p id="detectionDescription">Checking for legal documents</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Document Info -->
+            <section class="document-info" id="documentInfo" style="display: none;">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Type:</span>
+                        <span class="info-value" id="documentType">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Words:</span>
+                        <span class="info-value" id="wordCount">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Reading Time:</span>
+                        <span class="info-value" id="readingTime">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Confidence:</span>
+                        <span class="info-value" id="confidence">-</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Action Buttons -->
+            <section class="actions" id="actionsSection" style="display: none;">
+                <button class="btn btn-primary" id="summarizeBtn">
+                    <span class="btn-icon">📋</span>
+                    Get Summary
+                </button>
+                <button class="btn btn-secondary" id="askQuestionBtn">
+                    <span class="btn-icon">❓</span>
+                    Ask Question
+                </button>
+                <button class="btn btn-secondary" id="viewChunksBtn">
+                    <span class="btn-icon">📄</span>
+                    View Text Chunks
+                </button>
+            </section>
+
+            <!-- Summary Section -->
+            <section class="summary-section" id="summarySection" style="display: none;">
+                <div class="section-header">
+                    <h3>📋 Summary</h3>
+                    <button class="btn-icon-only" id="closeSummaryBtn">✕</button>
+                </div>
+                <div class="summary-content" id="summaryContent">
+                    <div class="loading" id="summaryLoading">
+                        <div class="spinner"></div>
+                        <span>Generating summary...</span>
+                    </div>
+                    <div class="summary-result" id="summaryResult" style="display: none;">
+                        <div class="summary-meta" id="summaryMeta"></div>
+                        <div class="key-points" id="keyPoints"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Question Section -->
+            <section class="question-section" id="questionSection" style="display: none;">
+                <div class="section-header">
+                    <h3>❓ Ask a Question</h3>
+                    <button class="btn-icon-only" id="closeQuestionBtn">✕</button>
+                </div>
+                <div class="question-content">
+                    <div class="question-input-group">
+                        <input type="text" id="questionInput" placeholder="What would you like to know about this document?" maxlength="200">
+                        <button class="btn btn-small" id="askBtn">Ask</button>
+                    </div>
+                    <div class="question-suggestions" id="questionSuggestions">
+                        <span class="suggestion-label">Quick questions:</span>
+                        <button class="suggestion-btn" data-question="What personal data is collected?">What data is collected?</button>
+                        <button class="suggestion-btn" data-question="How is my data used?">How is data used?</button>
+                        <button class="suggestion-btn" data-question="Can I delete my data?">Can I delete data?</button>
+                        <button class="suggestion-btn" data-question="Who has access to my data?">Who has access?</button>
+                    </div>
+                    <div class="answer-content" id="answerContent" style="display: none;">
+                        <div class="loading" id="answerLoading">
+                            <div class="spinner"></div>
+                            <span>Finding answer...</span>
+                        </div>
+                        <div class="answer-result" id="answerResult" style="display: none;">
+                            <div class="answer-text" id="answerText"></div>
+                            <div class="answer-sources" id="answerSources"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Text Chunks Section -->
+            <section class="chunks-section" id="chunksSection" style="display: none;">
+                <div class="section-header">
+                    <h3>📄 Text Chunks</h3>
+                    <button class="btn-icon-only" id="closeChunksBtn">✕</button>
+                </div>
+                <div class="chunks-content">
+                    <div class="chunks-navigation">
+                        <button class="btn btn-small" id="prevChunkBtn" disabled>◀ Previous</button>
+                        <span class="chunk-counter" id="chunkCounter">Chunk 1 of 0</span>
+                        <button class="btn btn-small" id="nextChunkBtn" disabled>Next ▶</button>
+                    </div>
+                    <div class="chunk-display" id="chunkDisplay">
+                        <div class="chunk-header" id="chunkHeader">
+                            <span class="chunk-title" id="chunkTitle">Loading...</span>
+                            <span class="chunk-type" id="chunkType"></span>
+                        </div>
+                        <div class="chunk-text" id="chunkText">
+                            Loading chunks...
+                        </div>
+                        <div class="chunk-meta" id="chunkMeta">
+                            <span class="chunk-words" id="chunkWords">0 words</span>
+                            <span class="chunk-chars" id="chunkChars">0 characters</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Error Section -->
+            <section class="error-section" id="errorSection" style="display: none;">
+                <div class="error-card">
+                    <div class="error-icon">⚠️</div>
+                    <div class="error-content">
+                        <h3>Something went wrong</h3>
+                        <p id="errorMessage">Unable to analyze this page.</p>
+                        <button class="btn btn-secondary" id="retryBtn">Try Again</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- No Legal Document -->
+            <section class="no-document-section" id="noDocumentSection" style="display: none;">
+                <div class="no-document-card">
+                    <div class="no-document-icon">📄</div>
+                    <div class="no-document-content">
+                        <h3>No legal document detected</h3>
+                        <p>This page doesn't appear to contain Terms of Service, Privacy Policy, or other legal documents.</p>
+                        <div class="no-document-tips">
+                            <p><strong>Tip:</strong> SafeAgree works best on:</p>
+                            <ul>
+                                <li>Terms of Service pages</li>
+                                <li>Privacy Policy pages</li>
+                                <li>Cookie Policy pages</li>
+                                <li>User Agreement pages</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-links">
+                <button class="footer-link" id="settingsBtn">⚙️ Settings</button>
+                <button class="footer-link" id="helpBtn">❓ Help</button>
+                <span class="version">v0.1.0</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

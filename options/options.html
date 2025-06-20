@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeAgree Settings</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🛡️ SafeAgree Settings</h1>
+            <p>Configure your privacy-first legal document assistant</p>
+        </header>
+
+        <main class="main-content">
+            <section class="settings-section">
+                <h2>Detection Settings</h2>
+                <div class="setting-item">
+                    <label class="switch">
+                        <input type="checkbox" id="autoDetect" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <div class="setting-info">
+                        <h3>Auto-detect legal documents</h3>
+                        <p>Automatically analyze pages for Terms of Service, Privacy Policies, and other legal documents</p>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <label class="switch">
+                        <input type="checkbox" id="showNotifications" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <div class="setting-info">
+                        <h3>Show notifications</h3>
+                        <p>Display notifications when legal documents are detected</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="settings-section">
+                <h2>Privacy Settings</h2>
+                <div class="setting-item">
+                    <label class="switch">
+                        <input type="checkbox" id="localProcessingOnly" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <div class="setting-info">
+                        <h3>Local processing only</h3>
+                        <p>Process all data locally without sending to external services</p>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <label class="switch">
+                        <input type="checkbox" id="cacheDocuments" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <div class="setting-info">
+                        <h3>Cache documents</h3>
+                        <p>Store analyzed documents locally for faster access</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="settings-section">
+                <h2>AI Model Settings</h2>
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <h3>Summarization Model</h3>
+                        <select id="summarizationModel">
+                            <option value="local">Local (Browser-based)</option>
+                            <option value="lm-studio">LM Studio</option>
+                            <option value="gpt4all">GPT4All</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <h3>Max Cache Size</h3>
+                        <input type="range" id="maxCacheSize" min="10" max="500" value="50">
+                        <span id="cacheSizeValue">50 MB</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="settings-section">
+                <h2>Advanced</h2>
+                <div class="setting-item">
+                    <label class="switch">
+                        <input type="checkbox" id="enableDebugLogging">
+                        <span class="slider"></span>
+                    </label>
+                    <div class="setting-info">
+                        <h3>Enable debug logging</h3>
+                        <p>Enable detailed logging for troubleshooting (may impact performance)</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <button class="btn btn-primary" id="saveBtn">Save Settings</button>
+            <button class="btn btn-secondary" id="resetBtn">Reset to Defaults</button>
+            <div class="save-status" id="saveStatus"></div>
+        </footer>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+</html>
