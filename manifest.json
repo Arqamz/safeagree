@@ -7,8 +7,7 @@
   "permissions": [
     "storage",
     "activeTab",
-    "scripting",
-    "offscreen"
+    "scripting"
   ],
   
   "host_permissions": [
@@ -24,7 +23,8 @@
         "*://*/legal*",
         "*://*/policy*",
         "*://*/tos*",
-        "*://*/tc*"
+        "*://*/tc*",
+        "<all_urls>"
       ],
       "js": [
         "utils/constants.js",
@@ -51,15 +51,5 @@
   "icons": {
     "16": "icons/icon16.png",
     "128": "icons/icon128.png"
-  },
-  
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "models/*",
-        "ai/*"
-      ],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }

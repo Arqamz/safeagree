@@ -4,17 +4,12 @@
 class SafeAgreeContentScript {
   constructor() {
     this.isInitialized = false;
-    this.currentState = SAFEAGREE_CONSTANTS.UI_CONFIG.STATES.IDLE;
+    this.currentState = (typeof SAFEAGREE_CONSTANTS !== 'undefined') ? 
+      SAFEAGREE_CONSTANTS.UI_CONFIG.STATES.IDLE : 'idle';
     this.pageAnalysis = null;
     this.textExtraction = null;
-    this.messageHandlers = new Map();
-    this.observerConfig = {
-      childList: true,
-      subtree: true,
-      attributes: false,
-      characterData: false
-    };
-    this.domObserver = null;
+    this.lastAnalysisTime = 0;
+    this.analysisThrottleMs = 2000; // Don't analyze more than once every 2 seconds
   }
 
   /**
@@ -33,9 +28,6 @@ class SafeAgreeContentScript {
       // Set up message handlers
       this.setupMessageHandlers();
       
-      // Set up DOM observer for dynamic content
-      this.setupDOMObserver();
-      
       // Perform initial page analysis
       await this.analyzeCurrentPage();
       
@@ -48,66 +40,42 @@ class SafeAgreeContentScript {
   }
 
   /**
-   * Set up message handlers for communication with background script and popup
+   * Set up message handlers for communication with popup
    */
   setupMessageHandlers() {
-    // Handle messages from background script
-    this.messageHandlers.set(SAFEAGREE_CONSTANTS.MESSAGE_TYPES.BACKGROUND_TO_CONTENT.START_ANALYSIS, 
-      this.handleStartAnalysis.bind(this));
-    
-    this.messageHandlers.set(SAFEAGREE_CONSTANTS.MESSAGE_TYPES.BACKGROUND_TO_CONTENT.GET_PAGE_TEXT, 
-      this.handleGetPageText.bind(this));
-    
-    this.messageHandlers.set(SAFEAGREE_CONSTANTS.MESSAGE_TYPES.BACKGROUND_TO_CONTENT.INJECT_UI, 
-      this.handleInjectUI.bind(this));
-    
-    // Listen for messages
+    // Listen for messages from popup
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      if (message.type && this.messageHandlers.has(message.type)) {
-        const handler = this.messageHandlers.get(message.type);
-        handler(message, sender, sendResponse);
-        return true; // Keep the message channel open for async responses
+      try {
+        const messageTypes = (typeof SAFEAGREE_CONSTANTS !== 'undefined') ? 
+          SAFEAGREE_CONSTANTS.MESSAGE_TYPES : {};
+        
+        if (message.type === 'get_status') {
+          sendResponse(this.getStatus());
+          return true;
+        }
+        
+        if (message.type === 'get_chunks') {
+          const chunks = this.getContentChunks();
+          console.log('SafeAgree - Text Chunks:', chunks);
+          sendResponse({ chunks: chunks });
+          return true;
+        }
+        
+        if (message.type === 'extract_text') {
+          this.extractText().then(result => {
+            console.log('SafeAgree - Extracted Text:', result);
+            sendResponse(result);
+          }).catch(error => {
+            console.error('SafeAgree - Extraction Error:', error);
+            sendResponse({ error: error.message });
+          });
+          return true;
+        }
+      } catch (error) {
+        console.error('SafeAgree - Message handler error:', error);
+        sendResponse({ error: error.message });
       }
     });
-  }
-
-  /**
-   * Set up DOM observer to detect dynamic content changes
-   */
-  setupDOMObserver() {
-    this.domObserver = new MutationObserver(
-      SafeAgreeHelpers.debounce(this.handleDOMChanges.bind(this), 1000)
-    );
-    
-    this.domObserver.observe(document.body, this.observerConfig);
-  }
-
-  /**
-   * Handle DOM changes that might indicate new content
-   * @param {Array} mutations - Array of mutation records
-   */
-  async handleDOMChanges(mutations) {
-    let significantChange = false;
-    
-    for (const mutation of mutations) {
-      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-        // Check if any added nodes contain significant text content
-        for (const node of mutation.addedNodes) {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            const textContent = node.textContent || '';
-            if (textContent.length > 100) {
-              significantChange = true;
-              break;
-            }
-          }
-        }
-      }
-    }
-    
-    if (significantChange) {
-      SafeAgreeHelpers.log('debug', 'Significant DOM changes detected, re-analyzing page');
-      await this.analyzeCurrentPage();
-    }
   }
 
   /**
@@ -115,190 +83,114 @@ class SafeAgreeContentScript {
    */
   async analyzeCurrentPage() {
     try {
-      this.setState(SAFEAGREE_CONSTANTS.UI_CONFIG.STATES.DETECTING);
-      
-      // Clear previous caches if URL changed
-      const currentURL = window.location.href;
-      if (this.lastAnalyzedURL !== currentURL) {
-        pageDetector.clearCache();
-        textExtractor.clearCache();
-        this.lastAnalyzedURL = currentURL;
+      // Throttle analysis to prevent performance issues
+      const now = Date.now();
+      if (now - this.lastAnalysisTime < this.analysisThrottleMs) {
+        SafeAgreeHelpers.log('debug', 'Analysis throttled');
+        return;
       }
+      this.lastAnalysisTime = now;
+
+      // Skip analysis for search pages and common non-legal domains
+      const url = window.location.href;
+      if (this.shouldSkipAnalysis(url)) {
+        this.setState('idle');
+        return;
+      }
+
+      this.setState('detecting');
       
-      // Perform page analysis
+      // Analyze page structure and content
       this.pageAnalysis = pageDetector.analyzePage();
       
-      // If legal document detected, extract text
+      console.log('SafeAgree - Page Analysis:', this.pageAnalysis);
+      
       if (this.pageAnalysis.isLegalDocument) {
-        this.setState(SAFEAGREE_CONSTANTS.UI_CONFIG.STATES.PROCESSING);
+        this.setState('ready');
         
+        // Extract text content
         this.textExtraction = textExtractor.extractPageText();
-        
-        if (this.textExtraction.success) {
-          this.setState(SAFEAGREE_CONSTANTS.UI_CONFIG.STATES.READY);
-          
-          // Notify background script
-          this.sendMessageToBackground(
-            SAFEAGREE_CONSTANTS.MESSAGE_TYPES.CONTENT_TO_BACKGROUND.PAGE_ANALYZED,
-            {
-              analysis: this.pageAnalysis,
-              extraction: this.textExtraction,
-              url: currentURL,
-              timestamp: Date.now()
-            }
-          );
-          
-          SafeAgreeHelpers.log('info', 'Legal document detected and processed', {
-            type: this.pageAnalysis.documentType,
-            confidence: this.pageAnalysis.confidence,
-            wordCount: this.textExtraction.metadata.wordCount
-          });
-          
-        } else {
-          this.setState(SAFEAGREE_CONSTANTS.UI_CONFIG.STATES.ERROR);
-          SafeAgreeHelpers.log('error', 'Text extraction failed', this.textExtraction.error);
-        }
-        
+        console.log('SafeAgree - Text Extraction:', this.textExtraction);
       } else {
-        this.setState(SAFEAGREE_CONSTANTS.UI_CONFIG.STATES.IDLE);
-        
-        // Still notify background script about non-legal pages
-        this.sendMessageToBackground(
-          SAFEAGREE_CONSTANTS.MESSAGE_TYPES.CONTENT_TO_BACKGROUND.DETECTION_STATUS,
-          {
-            isLegal: false,
-            analysis: this.pageAnalysis,
-            url: currentURL,
-            timestamp: Date.now()
-          }
-        );
+        this.setState('idle');
       }
       
     } catch (error) {
-      this.setState(SAFEAGREE_CONSTANTS.UI_CONFIG.STATES.ERROR);
-      SafeAgreeHelpers.log('error', 'Page analysis failed', error);
-      
-      this.sendMessageToBackground(
-        SAFEAGREE_CONSTANTS.MESSAGE_TYPES.CONTENT_TO_BACKGROUND.PAGE_ANALYZED,
-        {
-          error: error.message,
-          url: window.location.href,
-          timestamp: Date.now()
-        }
-      );
+      SafeAgreeHelpers.log('error', 'Failed to analyze page', error);
+      this.setState('error');
     }
   }
 
   /**
-   * Handle start analysis message from background
-   * @param {Object} message - Message object
-   * @param {Object} sender - Sender information
-   * @param {Function} sendResponse - Response callback
+   * Check if we should skip analysis for this URL
+   * @param {string} url - URL to check
+   * @returns {boolean} True if analysis should be skipped
    */
-  async handleStartAnalysis(message, sender, sendResponse) {
-    try {
-      await this.analyzeCurrentPage();
-      sendResponse({
-        success: true,
-        state: this.currentState,
-        analysis: this.pageAnalysis,
-        extraction: this.textExtraction
-      });
-    } catch (error) {
-      sendResponse({
-        success: false,
-        error: error.message
-      });
-    }
-  }
-
-  /**
-   * Handle get page text message from background
-   * @param {Object} message - Message object
-   * @param {Object} sender - Sender information
-   * @param {Function} sendResponse - Response callback
-   */
-  async handleGetPageText(message, sender, sendResponse) {
-    try {
-      const options = message.options || {};
-      const extraction = textExtractor.extractPageText(options);
-      
-      sendResponse({
-        success: true,
-        extraction: extraction
-      });
-    } catch (error) {
-      sendResponse({
-        success: false,
-        error: error.message
-      });
-    }
-  }
-
-  /**
-   * Handle inject UI message from background
-   * @param {Object} message - Message object
-   * @param {Object} sender - Sender information
-   * @param {Function} sendResponse - Response callback
-   */
-  handleInjectUI(message, sender, sendResponse) {
-    try {
-      // This could be used to inject a sidebar or overlay UI
-      // For now, we'll just acknowledge the message
-      sendResponse({
-        success: true,
-        message: 'UI injection not implemented yet'
-      });
-    } catch (error) {
-      sendResponse({
-        success: false,
-        error: error.message
-      });
-    }
-  }
-
-  /**
-   * Send message to background script
-   * @param {string} type - Message type
-   * @param {Object} data - Message data
-   */
-  sendMessageToBackground(type, data) {
-    chrome.runtime.sendMessage({
-      type: type,
-      data: data,
-      timestamp: Date.now()
-    }).catch(error => {
-      SafeAgreeHelpers.log('warn', 'Failed to send message to background', error);
-    });
-  }
-
-  /**
-   * Set current state and notify background
-   * @param {string} newState - New state
-   */
-  setState(newState) {
-    const oldState = this.currentState;
-    this.currentState = newState;
+  shouldSkipAnalysis(url) {
+    const skipDomains = [
+      'google.com',
+      'google.',
+      'bing.com',
+      'duckduckgo.com',
+      'search.yahoo.com',
+      'facebook.com',
+      'twitter.com',
+      'instagram.com',
+      'youtube.com',
+      'reddit.com'
+    ];
     
-    if (oldState !== newState) {
-      SafeAgreeHelpers.log('debug', `State changed: ${oldState} -> ${newState}`);
+    const skipPaths = [
+      '/search',
+      '/results',
+      '/q=',
+      '?q=',
+      '&q='
+    ];
+    
+    const lowerUrl = url.toLowerCase();
+    
+    // Skip search domains
+    if (skipDomains.some(domain => lowerUrl.includes(domain))) {
+      return true;
+    }
+    
+    // Skip search paths
+    if (skipPaths.some(path => lowerUrl.includes(path))) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Extract text from the current page
+   */
+  async extractText() {
+    try {
+      this.setState('processing');
       
-      // Notify background script of state change
-      this.sendMessageToBackground(
-        SAFEAGREE_CONSTANTS.MESSAGE_TYPES.CONTENT_TO_BACKGROUND.DETECTION_STATUS,
-        {
-          state: newState,
-          previousState: oldState,
-          url: window.location.href,
-          timestamp: Date.now()
-        }
-      );
+      // Re-extract text content
+      this.textExtraction = textExtractor.extractPageText();
+      
+      if (this.textExtraction) {
+        this.setState('ready');
+        return {
+          success: true,
+          data: this.textExtraction
+        };
+      } else {
+        throw new Error('Failed to extract text');
+      }
+      
+    } catch (error) {
+      this.setState('error');
+      throw error;
     }
   }
 
   /**
    * Get current analysis status
-   * @returns {Object} Current status
    */
   getStatus() {
     return {
@@ -316,77 +208,25 @@ class SafeAgreeContentScript {
 
   /**
    * Get extracted content chunks
-   * @param {Object} options - Options for chunk selection
-   * @returns {Array} Array of content chunks
    */
-  getContentChunks(options = {}) {
+  getContentChunks() {
     if (!this.textExtraction || !this.textExtraction.content.chunks) {
       return [];
     }
     
-    let chunks = this.textExtraction.content.chunks;
-    
-    // Apply filters if specified
-    if (options.maxChunks) {
-      chunks = chunks.slice(0, options.maxChunks);
-    }
-    
-    if (options.minLength) {
-      chunks = chunks.filter(chunk => chunk.text.length >= options.minLength);
-    }
-    
-    if (options.type) {
-      chunks = chunks.filter(chunk => chunk.type === options.type);
-    }
-    
-    return chunks;
+    return this.textExtraction.content.chunks;
   }
 
   /**
-   * Search within extracted content
-   * @param {string} query - Search query
-   * @param {Object} options - Search options
-   * @returns {Array} Array of matching chunks
+   * Set current state
    */
-  searchContent(query, options = {}) {
-    if (!this.textExtraction || !query) {
-      return [];
+  setState(newState) {
+    const oldState = this.currentState;
+    this.currentState = newState;
+    
+    if (oldState !== newState) {
+      SafeAgreeHelpers.log('info', `State changed from ${oldState} to ${newState}`);
     }
-    
-    const chunks = this.getContentChunks(options);
-    const queryLower = query.toLowerCase();
-    
-    return chunks
-      .map(chunk => ({
-        ...chunk,
-        relevance: SafeAgreeHelpers.calculateTextSimilarity(chunk.text, query),
-        hasExactMatch: chunk.text.toLowerCase().includes(queryLower)
-      }))
-      .filter(chunk => chunk.relevance > 0.1 || chunk.hasExactMatch)
-      .sort((a, b) => {
-        // Prioritize exact matches, then by relevance
-        if (a.hasExactMatch && !b.hasExactMatch) return -1;
-        if (!a.hasExactMatch && b.hasExactMatch) return 1;
-        return b.relevance - a.relevance;
-      });
-  }
-
-  /**
-   * Clean up resources
-   */
-  cleanup() {
-    if (this.domObserver) {
-      this.domObserver.disconnect();
-      this.domObserver = null;
-    }
-    
-    pageDetector.clearCache();
-    textExtractor.clearCache();
-    
-    this.messageHandlers.clear();
-    this.isInitialized = false;
-    
-    SafeAgreeHelpers.log('info', 'Content script cleaned up');
   }
 }
 
@@ -403,23 +243,22 @@ if (document.readyState === 'loading') {
   safeAgreeContent.init();
 }
 
-// Handle page unload
-window.addEventListener('beforeunload', () => {
-  safeAgreeContent.cleanup();
-});
-
 // Export for debugging and testing
 if (typeof window !== 'undefined') {
   window.safeAgreeContent = safeAgreeContent;
 }
 
-// Handle page navigation in SPAs
+// Handle page navigation in SPAs with debouncing
 let lastUrl = location.href;
+const debouncedAnalysis = SafeAgreeHelpers.debounce(() => {
+  SafeAgreeHelpers.log('debug', 'URL changed, re-analyzing page');
+  safeAgreeContent.analyzeCurrentPage();
+}, 1000); // Wait 1 second before re-analyzing
+
 new MutationObserver(() => {
   const url = location.href;
   if (url !== lastUrl) {
     lastUrl = url;
-    SafeAgreeHelpers.log('debug', 'URL changed, re-analyzing page');
-    safeAgreeContent.analyzeCurrentPage();
+    debouncedAnalysis();
   }
 }).observe(document, { subtree: true, childList: true });

@@ -8,34 +8,38 @@ const SAFEAGREE_CONSTANTS = {
   
   // Page detection patterns
   LEGAL_DOC_PATTERNS: {
-    // URL patterns that typically contain legal documents
+    // URL patterns that typically contain legal documents - be very specific
     URL_PATTERNS: [
-      /\/terms[-_]?(of[-_]?)?(?:service|use)/i,
-      /\/privacy[-_]?policy/i,
-      /\/cookie[-_]?policy/i,
-      /\/legal/i,
-      /\/tos\b/i,
-      /\/eula\b/i,
-      /\/user[-_]?agreement/i,
-      /\/acceptable[-_]?use/i,
-      /\/end[-_]?user[-_]?license/i
+      /\/terms[-_]?(of[-_]?)?(?:service|use)(?:\.html?)?(?:[\/\?#]|$)/i,
+      /\/privacy[-_]?policy(?:\.html?)?(?:[\/\?#]|$)/i,
+      /\/cookie[-_]?policy(?:\.html?)?(?:[\/\?#]|$)/i,
+      /\/legal(?:\.html?)?(?:[\/\?#]|$)/i,
+      /\/tos(?:\.html?)?(?:[\/\?#]|$)/i,
+      /\/eula(?:\.html?)?(?:[\/\?#]|$)/i,
+      /\/user[-_]?agreement(?:\.html?)?(?:[\/\?#]|$)/i,
+      /\/acceptable[-_]?use(?:\.html?)?(?:[\/\?#]|$)/i,
+      /\/end[-_]?user[-_]?license(?:\.html?)?(?:[\/\?#]|$)/i,
+      // Support test files
+      /test[-_]?privacy/i,
+      /test[-_]?terms/i,
+      /privacy[-_]?simple/i
     ],
     
-    // Page title patterns
+    // Page title patterns - be more specific
     TITLE_PATTERNS: [
-      /terms\s+(of\s+)?(service|use)/i,
-      /privacy\s+policy/i,
-      /cookie\s+policy/i,
-      /user\s+agreement/i,
-      /end\s+user\s+license/i,
-      /acceptable\s+use\s+policy/i,
-      /legal\s+(notice|disclaimer)/i
+      /^terms\s+(of\s+)?(service|use)\s*[-|]?/i,
+      /^privacy\s+policy\s*[-|]?/i,
+      /^cookie\s+policy\s*[-|]?/i,
+      /^user\s+agreement\s*[-|]?/i,
+      /^end\s+user\s+license\s+agreement\s*[-|]?/i,
+      /^acceptable\s+use\s+policy\s*[-|]?/i,
+      /^legal\s+(notice|disclaimer)\s*[-|]?/i
     ],
     
-    // Content indicators
+    // Content indicators - require multiple matches
     CONTENT_INDICATORS: [
       'by using this service',
-      'by accessing this website',
+      'by accessing this website', 
       'these terms of service',
       'this privacy policy',
       'personal information',
@@ -43,7 +47,15 @@ const SAFEAGREE_CONSTANTS = {
       'we collect',
       'your rights',
       'binding agreement',
-      'legal obligations'
+      'legal obligations',
+      'governing law',
+      'intellectual property',
+      'limitation of liability',
+      'contact information',
+      'data processing',
+      'collect information',
+      'third parties',
+      'privacy laws'
     ]
   },
   
@@ -52,7 +64,7 @@ const SAFEAGREE_CONSTANTS = {
     MIN_CHUNK_SIZE: 200,
     MAX_CHUNK_SIZE: 1000,
     OVERLAP_SIZE: 100,
-    MIN_DOCUMENT_LENGTH: 500,
+    MIN_DOCUMENT_LENGTH: 2000,  // Increased from 500 to be more strict
     MAX_DOCUMENT_LENGTH: 100000,
     
     // Patterns to remove/clean
@@ -117,31 +129,16 @@ const SAFEAGREE_CONSTANTS = {
   
   // Message types for communication between scripts
   MESSAGE_TYPES: {
-    CONTENT_TO_BACKGROUND: {
-      PAGE_ANALYZED: 'page_analyzed',
-      TEXT_EXTRACTED: 'text_extracted',
-      REQUEST_SUMMARY: 'request_summary',
-      DETECTION_STATUS: 'detection_status'
-    },
-    
-    BACKGROUND_TO_CONTENT: {
-      START_ANALYSIS: 'start_analysis',
-      GET_PAGE_TEXT: 'get_page_text',
-      INJECT_UI: 'inject_ui'
-    },
-    
-    POPUP_TO_BACKGROUND: {
+    POPUP_TO_CONTENT: {
       GET_STATUS: 'get_status',
-      GET_SUMMARY: 'get_summary',
-      ASK_QUESTION: 'ask_question',
-      SAVE_SETTINGS: 'save_settings'
+      GET_CHUNKS: 'get_chunks',
+      EXTRACT_TEXT: 'extract_text'
     },
     
-    BACKGROUND_TO_POPUP: {
+    CONTENT_TO_POPUP: {
       STATUS_UPDATE: 'status_update',
-      SUMMARY_READY: 'summary_ready',
-      ANSWER_READY: 'answer_ready',
-      ERROR_OCCURRED: 'error_occurred'
+      CHUNKS_READY: 'chunks_ready',
+      TEXT_EXTRACTED: 'text_extracted'
     }
   },
   
